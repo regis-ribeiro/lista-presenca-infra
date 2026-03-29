@@ -1,0 +1,18 @@
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: rede-local-pool
+  namespace: metallb-system
+spec:
+  addresses:
+  # O seu lote exclusivo para o K3s
+  - 192.168.1.226-192.168.1.230
+---
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: anuncio-l2
+  namespace: metallb-system
+spec:
+  ipAddressPools:
+  - rede-local-pool

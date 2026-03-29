@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: db-postgres
+  labels:
+    app: postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      # AQUI ESTÁ A MÁGICA: Prende o banco de dados exclusivamente no Master
+      nodeSelector:
+        kubernetes.io/hostname: pi-srv5
+      containers:
+        - name: postgres
+          image: postgres:15-alpine # Versão Alpine é muito mais leve (excelente para Raspberry)
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              value: "regis"
+            - name: POSTGRES_PASSWORD
+              value: "root"
+            - name: POSTGRES_DB
+              value: "lista_presenca"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: db-postgres # Este nome vira o DNS interno que o seu backend Java vai usar
+spec:
+  selector:
+    app: postgres
+  ports:
+    - port: 5432
+      targetPort: 5432

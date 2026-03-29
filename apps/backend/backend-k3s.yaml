@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lista-presenca-backend
+  labels:
+    app: backend
+spec:
+  replicas: 2 # Quantas cópias da sua API vão rodar simultaneamente
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      nodeSelector:
+          hardware: pizero
+      containers:
+        - name: backend
+          image: docker.io/reginaldoraraujo/lista-presenca-backend:latest
+          imagePullPolicy: Always # Força o K3s a sempre checar se há uma imagem :latest nova
+          ports:
+            - containerPort: 8080
+          resources:
+            requests:
+              memory: "150Mi" # O mínimo garantido para o pod nascer
+              cpu: "100m"     # 10% de um núcleo de CPU
+            limits:
+              memory: "250Mi" # O teto absoluto. Passou daqui, o K3s mata o pod (OOMKilled)
+              cpu: "300m"     # Máximo de 30% da CPU para não travar o Pi Zero
+          env:
+            - name: DB_URL
+              # Vai falhar inicialmente até subirmos o Postgres, mas já deixamos configurado!
+              value: "jdbc:postgresql://db-postgres:5432/lista_presenca"
+            - name: DB_USER
+              value: "regis"
+            - name: DB_PASS
+              value: "root"

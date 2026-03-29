@@ -1,0 +1,21 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: colegioconecta-ingress
+  namespace: default
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+spec:
+  rules:
+  - host: colegioconecta.nprd.app
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            # Apontando para o nome exato do seu output
+            name: frontend-service 
+            port:
+              # Usando a porta interna, por onde o Ingress vai rotear o tráfego
+              number: 80
