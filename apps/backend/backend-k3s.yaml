@@ -5,7 +5,7 @@ metadata:
   labels:
     app: backend
 spec:
-  replicas: 2 # Quantas cópias da sua API vão rodar simultaneamente
+  replicas: 4 # Quantas cópias da sua API vão rodar simultaneamente
   selector:
     matchLabels:
       app: backend
@@ -15,7 +15,7 @@ spec:
         app: backend
     spec:
       nodeSelector:
-          hardware: pizero
+        hardware: pizero
       containers:
         - name: backend
           image: docker.io/reginaldoraraujo/lista-presenca-backend:latest
@@ -28,7 +28,7 @@ spec:
               cpu: "100m"     # 10% de um núcleo de CPU
             limits:
               memory: "250Mi" # O teto absoluto. Passou daqui, o K3s mata o pod (OOMKilled)
-              cpu: "300m"     # Máximo de 30% da CPU para não travar o Pi Zero
+              cpu: "400m"     # Máximo de 30% da CPU para não travar o Pi Zero
           env:
             - name: DB_URL
               # Vai falhar inicialmente até subirmos o Postgres, mas já deixamos configurado!
@@ -37,3 +37,15 @@ spec:
               value: "regis"
             - name: DB_PASS
               value: "root"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: lista-presenca-backend
+spec:
+  selector:
+    app: backend
+  ports:
+    - port: 8080
+      targetPort: 8080
+  type: ClusterIP # O tipo mais simples, só acessível dentro do cluster. O Ingress vai rotear o tráfego externo para cá.  

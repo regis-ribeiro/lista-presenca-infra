@@ -4,8 +4,15 @@ metadata:
   name: colegioconecta-ingress
   namespace: default
   annotations:
-    kubernetes.io/ingress.class: "nginx"
+    # Aciona a fábrica de certificados que acabamos de criar
+    cert-manager.io/cluster-issuer: "emissor-local"
 spec:
+  ingressClassName: nginx # Especifica que queremos usar o controlador Nginx para este Ingress
+  tls:
+    - hosts:
+      - colegioconecta.nprd.app
+      # O cert-manager vai criar esse arquivo secret com a chave SSL automaticamente
+      secretName: colegioconecta-tls
   rules:
   - host: colegioconecta.nprd.app
     http:
