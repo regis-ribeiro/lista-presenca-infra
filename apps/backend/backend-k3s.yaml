@@ -22,6 +22,27 @@ spec:
           imagePullPolicy: Always # Força o K3s a sempre checar se há uma imagem :latest nova
           ports:
             - containerPort: 8080
+          # --- INÍCIO DAS SONDAS DE SAÚDE ---
+          
+          # Readiness: O pod está pronto para receber tráfego de usuários?
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8080
+            initialDelaySeconds: 15 # Espera 15s antes de perguntar pela 1ª vez
+            periodSeconds: 10       # Pergunta a cada 10 segundos
+            failureThreshold: 3     # Se falhar 3 vezes, tira do LoadBalancer
+            
+          # Liveness: O pod travou (Deadlock/OutOfMemory) e precisa ser reiniciado?
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8080
+            initialDelaySeconds: 20 # Dá 20s de fôlego pro Java subir nos Pi Zeros
+            periodSeconds: 15       # Pergunta a cada 15 segundos
+            failureThreshold: 3     # Se falhar 3 vezes, o K3s mata o pod e cria outro
+            
+          # --- FIM DAS SONDAS ---
           resources:
             requests:
               memory: "150Mi" # O mínimo garantido para o pod nascer
