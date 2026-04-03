@@ -5,12 +5,18 @@ metadata:
   labels:
     app: backend
 spec:
-  replicas: 4 # Quantas cópias da sua API vão rodar simultaneamente
+  replicas: 2 # Quantas cópias da sua API vão rodar simultaneamente
   selector:
     matchLabels:
       app: backend
   template:
     metadata:
+      annotations:
+        vault.hashicorp.com/agent-inject: "true"
+        vault.hashicorp.com/role: "backend-role"
+        vault.hashicorp.com/agent-inject-secret-spring.datasource.password: "secret/data/colegio-conecta/database"
+        vault.hashicorp.com/agent-inject-template-spring.datasource.password: |
+          {{- with secret "secret/data/colegio-conecta/database" -}}{{ .Data.data.password }}{{- end -}}
       labels:
         app: backend
     spec:
@@ -23,7 +29,6 @@ spec:
           ports:
             - containerPort: 8080
           # --- INÍCIO DAS SONDAS DE SAÚDE ---
-          
           # Readiness: O pod está pronto para receber tráfego de usuários?
           readinessProbe:
             httpGet:
@@ -31,6 +36,7 @@ spec:
               port: 8080
             initialDelaySeconds: 15 # Espera 15s antes de perguntar pela 1ª vez
             periodSeconds: 10       # Pergunta a cada 10 segundos
+            timeoutSeconds: 30      # Se a resposta demorar mais de 15s, considera que falhou
             failureThreshold: 3     # Se falhar 3 vezes, tira do LoadBalancer
             
           # Liveness: O pod travou (Deadlock/OutOfMemory) e precisa ser reiniciado?
@@ -38,26 +44,40 @@ spec:
             httpGet:
               path: /actuator/health/liveness
               port: 8080
-            initialDelaySeconds: 20 # Dá 20s de fôlego pro Java subir nos Pi Zeros
+            initialDelaySeconds: 900 # Dá 900s de fôlego pro Java subir nos Pi Zeros
             periodSeconds: 15       # Pergunta a cada 15 segundos
+            timeoutSeconds: 30      # Se a resposta demorar mais de 30s, considera que falhou
             failureThreshold: 3     # Se falhar 3 vezes, o K3s mata o pod e cria outro
-            
           # --- FIM DAS SONDAS ---
           resources:
             requests:
               memory: "150Mi" # O mínimo garantido para o pod nascer
               cpu: "100m"     # 10% de um núcleo de CPU
             limits:
-              memory: "250Mi" # O teto absoluto. Passou daqui, o K3s mata o pod (OOMKilled)
-              cpu: "400m"     # Máximo de 30% da CPU para não travar o Pi Zero
+              memory: "220Mi" # O teto absoluto. Passou daqui, o K3s mata o pod (OOMKilled)
+              cpu: "400m"     # Máximo de 40% da CPU para não travar o Pi Zero
           env:
             - name: DB_URL
-              # Vai falhar inicialmente até subirmos o Postgres, mas já deixamos configurado!
               value: "jdbc:postgresql://db-postgres:5432/lista_presenca"
             - name: DB_USER
               value: "regis"
-            - name: DB_PASS
-              value: "root"
+            # 1. Ajustes Finais da Máquina Virtual Java
+            - name: JAVA_TOOL_OPTIONS
+              value: "-XX:+UseSerialGC -Xmx128m -Xms64m -XX:MaxMetaspaceSize=96m -Xss256k"
+              
+            # 2. Ajuste do Pool de Conexões (HikariCP)
+            - name: SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE
+              value: "3"
+            - name: SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE
+              value: "1"
+              
+            # 3. Ajustes do Spring Boot e Hibernate
+            - name: SPRING_MAIN_LAZY_INITIALIZATION
+              value: "true"
+            - name: SPRING_JPA_OPEN_IN_VIEW
+              value: "false"
+            - name: SPRING_JMX_ENABLED
+              value: "false"
 ---
 apiVersion: v1
 kind: Service

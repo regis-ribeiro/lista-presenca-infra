@@ -24,20 +24,25 @@ spec:
     metadata:
       labels:
         app: postgres
+      annotations:
+        vault.hashicorp.com/agent-inject: "true"
+        vault.hashicorp.com/role: "database-role"
+        vault.hashicorp.com/agent-inject-secret-db_pass: "secret/data/colegio-conecta/database"
+        vault.hashicorp.com/agent-inject-template-db_pass: |
+          {{- with secret "secret/data/colegio-conecta/database" -}}{{ .Data.data.password }}{{- end -}}
     spec:
-      # AQUI ESTÁ A MÁGICA: Prende o banco de dados exclusivamente no Master
       nodeSelector:
         kubernetes.io/hostname: pi-srv5
       containers:
         - name: postgres
-          image: postgres:15-alpine # Versão Alpine é muito mais leve (excelente para Raspberry)
+          image: postgres:15-alpine
           ports:
             - containerPort: 5432
           env:
             - name: POSTGRES_USER
               value: "regis"
-            - name: POSTGRES_PASSWORD
-              value: "root"
+            - name: POSTGRES_PASSWORD_FILE
+              value: /vault/secrets/db_pass
             - name: POSTGRES_DB
               value: "lista_presenca"
           volumeMounts:
@@ -51,7 +56,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: db-postgres # Este nome vira o DNS interno que o seu backend Java vai usar
+  name: db-postgres
 spec:
   selector:
     app: postgres
