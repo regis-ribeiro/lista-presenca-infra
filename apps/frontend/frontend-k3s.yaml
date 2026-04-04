@@ -6,7 +6,7 @@ metadata:
   labels:
     app: frontend
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       app: frontend
@@ -16,7 +16,8 @@ spec:
         app: frontend
     spec:
       nodeSelector:
-        hardware: pizero
+        kubernetes.io/hostname: pi-srv5
+        #hardware: pizero
       containers:
       - name: frontend
         image: docker.io/reginaldoraraujo/lista-presenca-frontend:latest

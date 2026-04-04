@@ -5,73 +5,78 @@ metadata:
   labels:
     app: backend
 spec:
-  replicas: 2 # Quantas cópias da sua API vão rodar simultaneamente
+  replicas: 2
   selector:
     matchLabels:
       app: backend
   template:
     metadata:
-      annotations:
-        vault.hashicorp.com/agent-inject: "true"
-        vault.hashicorp.com/role: "backend-role"
-        vault.hashicorp.com/agent-inject-secret-spring.datasource.password: "secret/data/colegio-conecta/database"
-        vault.hashicorp.com/agent-inject-template-spring.datasource.password: |
-          {{- with secret "secret/data/colegio-conecta/database" -}}{{ .Data.data.password }}{{- end -}}
       labels:
         app: backend
+      annotations:
+        # Aqui é o local exato para o Vault ler
+        vault.hashicorp.com/agent-inject: "true"
+        vault.hashicorp.com/role: "backend-role"
+        vault.hashicorp.com/agent-inject-secret-database.properties: "secret/data/colegio-conecta/database"
+        vault.hashicorp.com/agent-inject-template-database.properties: |
+          {{- with secret "secret/data/colegio-conecta/database" -}}
+          spring.datasource.password={{ .Data.data.password }}
+          {{- end -}}
     spec:
       nodeSelector:
         hardware: pizero
       containers:
         - name: backend
           image: docker.io/reginaldoraraujo/lista-presenca-backend:latest
-          imagePullPolicy: Always # Força o K3s a sempre checar se há uma imagem :latest nova
+          imagePullPolicy: Always
           ports:
             - containerPort: 8080
-          # --- INÍCIO DAS SONDAS DE SAÚDE ---
-          # Readiness: O pod está pronto para receber tráfego de usuários?
+          startupProbe:
+            httpGet:
+              path: /alunos
+              port: 8080
+            failureThreshold: 120    # Tenta 120 vezes antes de desistir
+            periodSeconds: 5
           readinessProbe:
             httpGet:
               path: /actuator/health/readiness
               port: 8080
-            initialDelaySeconds: 15 # Espera 15s antes de perguntar pela 1ª vez
-            periodSeconds: 10       # Pergunta a cada 10 segundos
-            timeoutSeconds: 30      # Se a resposta demorar mais de 15s, considera que falhou
-            failureThreshold: 3     # Se falhar 3 vezes, tira do LoadBalancer
-            
-          # Liveness: O pod travou (Deadlock/OutOfMemory) e precisa ser reiniciado?
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 15
+            failureThreshold: 3
           livenessProbe:
             httpGet:
               path: /actuator/health/liveness
               port: 8080
-            initialDelaySeconds: 900 # Dá 900s de fôlego pro Java subir nos Pi Zeros
-            periodSeconds: 15       # Pergunta a cada 15 segundos
-            timeoutSeconds: 30      # Se a resposta demorar mais de 30s, considera que falhou
-            failureThreshold: 3     # Se falhar 3 vezes, o K3s mata o pod e cria outro
-          # --- FIM DAS SONDAS ---
+            initialDelaySeconds: 600
+            periodSeconds: 15
+            timeoutSeconds: 15
+            failureThreshold: 3
           resources:
             requests:
-              memory: "150Mi" # O mínimo garantido para o pod nascer
-              cpu: "100m"     # 10% de um núcleo de CPU
+              memory: "150Mi"
+              cpu: "100m"
             limits:
-              memory: "220Mi" # O teto absoluto. Passou daqui, o K3s mata o pod (OOMKilled)
-              cpu: "400m"     # Máximo de 40% da CPU para não travar o Pi Zero
+              memory: "250Mi"
+              cpu: "400m"
           env:
             - name: DB_URL
               value: "jdbc:postgresql://db-postgres:5432/lista_presenca"
             - name: DB_USER
               value: "regis"
-            # 1. Ajustes Finais da Máquina Virtual Java
+            
+            # --- O Pulo do Gato para o Spring ler o Vault ---
+            - name: SPRING_CONFIG_IMPORT
+              value: "optional:file:/vault/secrets/database.properties"
+              
+            # --- Dieta da Memória ---
             - name: JAVA_TOOL_OPTIONS
               value: "-XX:+UseSerialGC -Xmx128m -Xms64m -XX:MaxMetaspaceSize=96m -Xss256k"
-              
-            # 2. Ajuste do Pool de Conexões (HikariCP)
             - name: SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE
               value: "3"
             - name: SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE
               value: "1"
-              
-            # 3. Ajustes do Spring Boot e Hibernate
             - name: SPRING_MAIN_LAZY_INITIALIZATION
               value: "true"
             - name: SPRING_JPA_OPEN_IN_VIEW
@@ -89,4 +94,4 @@ spec:
   ports:
     - port: 8080
       targetPort: 8080
-  type: ClusterIP # O tipo mais simples, só acessível dentro do cluster. O Ingress vai rotear o tráfego externo para cá.  
+  type: ClusterIP
