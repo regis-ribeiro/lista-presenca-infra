@@ -4,26 +4,34 @@ metadata:
   name: colegioconecta-ingress
   namespace: default
   annotations:
-    # Aciona a fábrica de certificados que acabamos de criar
     cert-manager.io/cluster-issuer: "emissor-local"
     nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    # A MÁGICA: Remove o /api do caminho antes de enviar ao Pod do backend, porque o Spring Boot não tem essa rota
+    nginx.ingress.kubernetes.io/rewrite-target: /\$1
 spec:
-  ingressClassName: nginx # Especifica que queremos usar o controlador Nginx para este Ingress
+  ingressClassName: nginx
   tls:
     - hosts:
       - colegioconecta.nprd.app
-      # O cert-manager vai criar esse arquivo secret com a chave SSL automaticamente
       secretName: colegioconecta-tls
   rules:
   - host: colegioconecta.nprd.app
     http:
       paths:
+      # Rota Front (Apontando para o frontend-k3s.yaml)
       - path: /
         pathType: Prefix
         backend:
           service:
-            # Apontando para o nome exato do seu output
-            name: frontend-service 
+            name: lista-presenca-frontend 
             port:
-              # Usando a porta interna, por onde o Ingress vai rotear o tráfego
               number: 80
+      # Rota API (Apontando para o backend-k3s.yaml)
+      # Captura tudo após /api e joga na variável \$1, que é usada no rewrite-target para remover o /api do caminho
+      - path: /api/?(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: lista-presenca-backend
+            port:
+              number: 8080
