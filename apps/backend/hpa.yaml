@@ -21,4 +21,4 @@ spec:
       name: cpu
       target:
         type: Utilization
-        averageUtilization: 50 # Se a média de uso de CPU passar de 50%, ligue mais pods!
+        averageUtilization: 85 # Se a média de uso de CPU passar de 85%, ligue mais pods!
