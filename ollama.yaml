@@ -1,0 +1,19 @@
+name: Mac M4 Optimized
+version: 1.0.0
+models:
+  # Modelo principal para Chat e Raciocínio (Estudos)
+  - name: Mistral-Nemo 12B
+    provider: ollama
+    model: mistral-nemo
+    apiBase: http://localhost:11434
+    roles:
+      - chat
+      - edit
+
+  # Modelo ultra-rápido para Autocomplete de código
+  - name: Qwen 2.5 Coder 7B
+    provider: ollama
+    model: qwen2.5-coder:7b
+    apiBase: http://localhost:11434
+    roles:
+      - autocomplete
